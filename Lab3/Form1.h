@@ -1,4 +1,4 @@
-﻿//Form1.h : version 0.2.2
+﻿//Form1.h : version 0.2.3
 //
 #include <msclr\marshal_cppstd.h>
 #include "stdafx.h"
@@ -7,116 +7,8 @@
 #include <iostream>
 #include <sstream>
 #include <regex>
-#include <cctype>
-namespace std {
-
-	double parseString(char* sub, int f, int t) {
-		int subPar = 0;
-		vector<char> operations;
-		vector<double> nums;
-		bool operationLast = true;
-		for (int i = f; i < t; i++) {
-			if (sub[i] == '(') {
-				operationLast = false;
-				int braccount = 0;
-				for (int j = i; j <= t; j++) {
-					if (sub[j] == '(')
-						braccount++;
-					if (sub[j] == ')') {
-						if (--braccount == 0) {
-							if (i + 1 != j)
-								nums.push_back(parseString(sub, i + 1, j));
-							i = j;
-							break;
-						}
-					}
-					if (j == t) {
-						cout << "Error: A bracket was opened but not closed." << endl;
-						system("pause");
-						exit(1);
-					}
-				}
-			}
-			else if (sub[i] == ')') {
-				operationLast = false;
-				cout << "Error: A bracket was closed but not opened." << endl;
-				system("pause");
-				exit(1);
-			}
-			else if (!operationLast && (sub[i] == '+' || sub[i] == '-' || sub[i] == '*' || sub[i] == '/' || sub[i] == '^')) {
-				operationLast = true;
-				operations.push_back(sub[i]);
-			}
-			else if (operationLast && (sub[i] == '+' || sub[i] == '-')) {
-				operationLast == false;
-				nums.push_back((sub[i] == '+' ? 1 : -1));
-				operations.push_back('*');
-			}
-			else if (isdigit((unsigned char)sub[i]) || sub[i] == '.') {
-				operationLast = false;
-				ostringstream s;
-				if (sub[i] == '.')
-					s << '0';
-				s << sub[i];
-				while (i + 1 < t && (isdigit(sub[i + 1]) || sub[i + 1] == '.'))
-					s << sub[++i];
-				nums.push_back(stod(s.str()));
-				s.clear();
-			}
-			else {
-				cout << "Error: A character could not be interpreted: " << sub[i] << endl;
-				system("pause");
-				exit(1);
-			}
-		}
-		while (operations.size() > 0 && nums.size() >= 2) {
-			int i = 0;
-			char c;
-			double a, b;
-			char ops[] = { '^','*','/','+','-' };
-			int j = 0;
-			if (operations.size() > 1)
-				for (i = 0; i < operations.size(); i++) {
-					if (operations.at(i) == ops[j])
-						break;
-					if (i + 1 >= operations.size() && j < strlen(ops)) {
-						j++;
-						i = 0;
-					}
-				}
-			c = operations.at(i);
-			operations.erase(operations.begin() + i, operations.begin() + i + 1);
-			a = nums.at(i);
-			b = nums.at(i + 1);
-			nums.erase(nums.begin() + i + 1, nums.begin() + i + 2);
-			switch (c) {
-			case '+':
-				nums.at(i) = a + b;
-				break;
-			case '-':
-				nums.at(i) = a - b;
-				break;
-			case '*':
-				nums.at(i) = a * b;
-				break;
-			case '/':
-				nums.at(i) = (double)(a / b);
-				break;
-			case '^':
-				nums.at(i) = pow(a, b);
-				break;
-			default:
-				break;
-			}
-		}
-		if (operations.size() > 0) {
-			cout << "Error: There are more operations than numbers." << endl;
-			system("pause");
-			exit(1);
-		}
-		return nums.front();
-	}
-}
+#include <algorithm>
+using namespace std;
 
 namespace CppCLR_WinformsProjekt {
 
@@ -126,12 +18,19 @@ namespace CppCLR_WinformsProjekt {
 	using namespace System::Windows::Forms;
 	using namespace System::Data;
 	using namespace System::Drawing;
+
+	/// <summary>
+	/// Zusammenfassung für Form1
+	/// </summary>
 	public ref class Form1 : public System::Windows::Forms::Form
 	{
 	public:
 		Form1(void)
 		{
 			InitializeComponent();
+			//
+			//TODO: Konstruktorcode hier hinzufügen.
+			//
 		}
 
 	protected:
@@ -535,56 +434,234 @@ namespace CppCLR_WinformsProjekt {
 			this->PerformLayout();
 
 		}
+	private: const double minVal = numeric_limits<double>::lowest();
+	private: char* prevop = new char[2]{ '0','\0' };
+	private: double prevnum = 0;
+	private: bool subdec = false;
 
-		private: System::Void button1_Click(System::Object^ sender, System::EventArgs^ e) {
-			this->label2->Select();
-			msclr::interop::marshal_context context;
-			std::string c = context.marshal_as<std::string>(this->textBox1->Text);
-			c.erase(remove(c.begin(),c.end(),','),c.end());
-			double d = std::parseString((char*)c.c_str(), 0, c.length());
-			String^ b;
+
+	private: double insideParenth5(char* sub, int *t, bool *operationLast, vector<char> *operations, vector<double> *nums) {
+		if (operations->size() > nums->size() - 1) {
+			MessageBox::Show("There are more operations than numbers or not enough numbers.", "Error", MessageBoxButtons::OK, MessageBoxIcon::Information);
+			return minVal;
+		}
+		while (operations->size() > 0 && nums->size() >= 2) {
+			unsigned int k = 0;
+			char c;
+			double a, b;
+			char ops[] = { '^','*','/','+','-' };
+			unsigned int j = 0;
+			if (operations->size() > 1)
+				for (k = 0; k < operations->size(); k++) {
+					if (operations->at(k) == ops[j])
+						break;
+					if (k + 1 >= operations->size() && j < strlen(ops)) {
+						j++;
+						k = -1;
+					}
+				}
+			c = operations->at(k);
+			operations->erase(operations->begin() + k, operations->begin() + k + 1);
+			a = nums->at(k);
+			b = nums->at(k + 1);
+			nums->erase(nums->begin() + k + 1, nums->begin() + k + 2);
+			*prevop = c;
+			prevnum = b;
+			switch (c) {
+			case '+':
+				nums->at(k) = a + b;
+				break;
+			case '-':
+				nums->at(k) = a - b;
+				break;
+			case '*':
+				nums->at(k) = a * b;
+				break;
+			case '/':
+				nums->at(k) = (double)(a / b);
+				break;
+			case '^':
+				nums->at(k) = pow(a, b);
+			default:
+				break;
+			}
+		}
+		if (nums->size() == 0) {
+			MessageBox::Show("No data to parse.", "Error", MessageBoxButtons::OK, MessageBoxIcon::Information);
+			return minVal;
+		}
+		return 0;
+	}
+
+	private: double insideParenth4(char* sub, int *t, int *i, bool *operationLast, vector<char> *operations, vector<double> *nums) {
+		if (isdigit(*sub) || *sub == '.') {
+			*operationLast = false;
+			int curi = *i;
+			ostringstream s;
+			if (*sub == '.') {
+				if (subdec) {
+					MessageBox::Show("Too many decimals in the input.", "Error", MessageBoxButtons::OK, MessageBoxIcon::Information);
+					return minVal;
+				}
+				s << '0';
+				subdec = true;
+			}
+			s << *sub;
+			while (*i + 1 < *t && (*i - curi) < 49 && (isdigit(*(sub + 1)) || *(sub + 1) == '.')) {
+				if (*(sub + 1) == '.') {
+					if (subdec) {
+						MessageBox::Show("Too many decimals in the input.", "Error", MessageBoxButtons::OK, MessageBoxIcon::Information);
+						return minVal;
+					}
+					subdec = true;
+				}
+				s << *(++sub);
+				(*i)++;
+			}
+			if ((*i - curi) == 49) {
+				MessageBox::Show("A number is too big to be calculated here. Maximum accuracy is 50 characters", "Error", MessageBoxButtons::OK, MessageBoxIcon::Information);
+				return minVal;
+			}
+			nums->push_back(stod(s.str()));
+			s.clear();
+		}
+		else {
+			MessageBox::Show(String::Concat("A character could not be interpreted: ", Convert::ToChar(*sub)), "Error", MessageBoxButtons::OK, MessageBoxIcon::Information);
+			return minVal;
+		}
+		return 0;
+	}
+
+	private: double insideParenth3(char* sub, int *t, int *i, bool *operationLast, vector<char> *operations, vector<double> *nums) {
+		if (*operationLast && (*sub == '+' || *sub == '-')) {
+			*operationLast = false;
+			nums->push_back((*sub == '+' ? 1 : -1));
+			operations->push_back('*');
+		}
+		else
+			return insideParenth4(sub, t, i, operationLast, operations, nums);
+		return 0;
+	}
+
+	private: double insideParenth2(char* sub, int *t, int *i, bool *operationLast, vector<char> *operations, vector<double> *nums) {
+		if (!*operationLast && (*sub == '+' || *sub == '-' || *sub == '*' || *sub == '/' || *sub == '^')) {
+			*operationLast = true;
+			operations->push_back(*sub);
+		}
+		else
+			return insideParenth3(sub, t, i, operationLast, operations, nums);
+		return 0;
+	}
+	private: double insideParenth1(char* sub, int *t, int *i, bool *operationLast, vector<char> *operations, vector<double> *nums) {
+		subdec = false;
+		if (*sub == ')') {
+			*operationLast = false;
+			MessageBox::Show("A bracket was closed but not opened.", "Error", MessageBoxButtons::OK, MessageBoxIcon::Information);
+			return minVal;
+		}
+		return insideParenth2(sub, t, i, operationLast, operations, nums);
+	}
+
+	private: double findParenth(char* sub, int f, int t) {
+		int subPar = 0;
+		vector<char> operations;
+		vector<double> nums;
+		bool operationLast = true;
+		for (int i = f; i < t; i++) {
+			if (sub[i] == '(') {
+				if (i > 0 && (sub[i - 1] != '+' && sub[i - 1] != '-' && sub[i - 1] != '*' && sub[i - 1] != '/' && sub[i - 1] != '^' && sub[i - 1] != '('))
+					operations.push_back('*');
+				operationLast = false;
+				int braccount = 0;
+				for (int j = i; j <= t; j++) {
+					if (sub[j] == '(')
+						braccount++;
+					if (sub[j] == ')') {
+						if (--braccount == 0) {
+							if (i + 1 != j)
+								nums.push_back(findParenth(sub, i + 1, j));
+							i = j;
+							if (i < t - 1 && (sub[i + 1] != '+' && sub[i + 1] != '-' && sub[i + 1] != '*' && sub[i + 1] != '/' && sub[i + 1] != '^'))
+								operations.push_back('*');
+							break;
+						}
+					}
+					if (j == t) {
+						MessageBox::Show("A bracket was opened but not closed.", "Error", MessageBoxButtons::OK, MessageBoxIcon::Information);
+						return minVal;
+					}
+				}
+			}
+			else if (insideParenth1((sub + i), &t, &i, &operationLast, &operations, &nums) < 0)
+				return minVal;
+		}
+		if (insideParenth5(sub, &t, &operationLast, &operations, &nums) < 0)
+			return minVal;
+		return nums.front();
+	}
+
+	private: System::Void button1_Click(System::Object^ sender, System::EventArgs^ e) {
+		if (*prevop != '0')
+			this->textBox1->Text += (gcnew String(prevop)) + prevnum.ToString();
+		this->label2->Select();
+		msclr::interop::marshal_context context;
+		string c = context.marshal_as<std::string>(this->textBox1->Text);
+		c.erase(remove(c.begin(), c.end(), ','), c.end());
+		double d = findParenth((char*)c.c_str(), 0, c.length());
+		String^ b;
+		if (d > minVal && d < -minVal) {
 			b = gcnew String(d.ToString("N20"));
 			int i;
 			for (i = b->Length - 1; i > 0 && b[i] == '0'; i--);
 			b = b->Substring(0, i + 1);
 			b = b->TrimEnd('.');
-			this->textBox1->Text = b;
 		}
-
-		private: System::Void Form1_Load(System::Object^ sender, System::EventArgs^ e) {
-			this->richTextBox1->SelectionStart = 9;
-			this->richTextBox1->SelectionLength = 5;
-			this->richTextBox1->SelectionFont = gcnew System::Drawing::Font(richTextBox1->Font->FontFamily, richTextBox1->Font->Size, FontStyle::Strikeout);
-			this->richTextBox1->Enabled = false;
-			this->label2->Select();
+		else {
+			if (isinf(abs(d)))
+				MessageBox::Show("A number was too big to calculate.", "Error", MessageBoxButtons::OK, MessageBoxIcon::Information);
+			b = this->textBox1->Text;
 		}
+		this->textBox1->Text = b;
+	}
 
-		private: System::Void btnAll_Click(System::Object^  sender, System::EventArgs^  e) {
-			this->label2->Select();
-			if (this->textBox1->Text == "0")
+	private: System::Void Form1_Load(System::Object^ sender, System::EventArgs^ e) {
+		this->richTextBox1->SelectionStart = 9;
+		this->richTextBox1->SelectionLength = 5;
+		this->richTextBox1->SelectionFont = gcnew System::Drawing::Font(richTextBox1->Font->FontFamily, richTextBox1->Font->Size, FontStyle::Strikeout);
+		this->richTextBox1->Enabled = false;
+		this->label2->Select();
+	}
+
+	private: System::Void btnAll_Click(System::Object^  sender, System::EventArgs^  e) {
+		this->label2->Select();
+		if (this->textBox1->Text == "0")
+			this->textBox1->Text = "";
+		this->textBox1->Text = String::Concat(this->textBox1->Text, ((Button^)sender)->Text);
+	}
+	private: System::Void Form1_KeyPress(System::Object^  sender, System::Windows::Forms::KeyPressEventArgs^  e) {
+		if (e->KeyChar == 13) {
+			button1_Click(this->btnEqual, e);
+		}
+		else if (e->KeyChar == 8) {
+			btnBack_Click(this->btnBack, e);
+		}
+		else if (e->KeyChar != 16) {
+			*prevop = '0';
+			prevnum = 0;
+			if (this->textBox1->Text == "0" && e->KeyChar != '^' && e->KeyChar != '*' && e->KeyChar != '/' && e->KeyChar != '+' && e->KeyChar != '-' && e->KeyChar != '.')
 				this->textBox1->Text = "";
-			this->textBox1->Text = String::Concat(this->textBox1->Text, ((Button^)sender)->Text);
+			this->textBox1->Text = String::Concat(this->textBox1->Text, e->KeyChar);
 		}
-		private: System::Void Form1_KeyPress(System::Object^  sender, System::Windows::Forms::KeyPressEventArgs^  e) {
-			if (e->KeyChar == 13) {
-				button1_Click(this->btnEqual, e);
-			}
-			else if (e->KeyChar == 8) {
-				btnBack_Click(this->btnBack,e);
-			}
-			else if (e->KeyChar != 16) {
-				if (this->textBox1->Text == "0" && e->KeyChar != '^' && e->KeyChar != '*' && e->KeyChar != '/' && e->KeyChar != '+' && e->KeyChar != '-' && e->KeyChar != '.')
-					this->textBox1->Text = "";
-				this->textBox1->Text = String::Concat(this->textBox1->Text, e->KeyChar);
-			}
-		}
+	}
 
-		private: System::Void btnBack_Click(System::Object^  sender, System::EventArgs^  e) {
-			this->label2->Select();
-			if (this->textBox1->Text->Length == 1)
-				this->textBox1->Text = "0";
-			else
-				this->textBox1->Text = this->textBox1->Text->Substring(0,this->textBox1->Text->Length - 1);
-		}
+	private: System::Void btnBack_Click(System::Object^  sender, System::EventArgs^  e) {
+		*prevop = '0';
+		prevnum = 0;
+		this->label2->Select();
+		if (this->textBox1->Text->Length == 1)
+			this->textBox1->Text = "0";
+		else
+			this->textBox1->Text = this->textBox1->Text->Substring(0, this->textBox1->Text->Length - 1);
+	}
 	};
 }
