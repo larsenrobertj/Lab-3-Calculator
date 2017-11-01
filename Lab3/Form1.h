@@ -1,4 +1,4 @@
-﻿//Form1.h : version 0.2.3
+﻿//Form1.h : version 1.0.0
 //
 #include <msclr\marshal_cppstd.h>
 #include "stdafx.h"
